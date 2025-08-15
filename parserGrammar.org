@@ -1,0 +1,8 @@
+#+title: Parser Grammar
+
+Grammar of parser:
+
+expr   ::= term ((+|-) term)*
+term   ::= factor ((*|/) factor)*
+factor ::= base (^factor)*
+base   ::= rational | "(" expr ")" | "sqrt(" expr  ")" | "-" base
