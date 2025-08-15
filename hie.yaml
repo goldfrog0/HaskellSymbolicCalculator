@@ -1,0 +1,8 @@
+cradle:
+  cabal:
+    - path: "src"
+      component: "lib:mathparsing"
+    - path: "app"
+      component: "mathparsing:exe:mathparsing-exe"
+    - path: "test"
+      component: "mathparsing:test:mathparsing-test"

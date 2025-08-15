@@ -5,8 +5,8 @@ import Data.List
 import Data.Ratio
 import Control.Applicative
 
-data ReducedSqrt = Irrational Integer Integer
-                 | Perfect Integer
+data ReducedSqrt = Irrational (Ratio Integer) (Ratio Integer)
+                 | Perfect (Ratio Integer)
                  | Sum ReducedSqrt ReducedSqrt
 
 instance Num ReducedSqrt where
@@ -28,12 +28,23 @@ instance Num ReducedSqrt where
   signum (Irrational a _) = Perfect $ signum a
   signum (Sum a b) = error "indeterminant, implment later"
 
-  fromInteger = Perfect
+  fromInteger x = Perfect (x % 1)
 
 instance Show ReducedSqrt where
 
-    show (Irrational a b) = show a ++ " sqrt(" ++ show b ++ ")"
-    show (Perfect a)      = show a
+    show (Irrational a b) =
+      case (denominator a, denominator b) of
+      (1, 1) -> sqrtShow (numerator a) (numerator b)
+      (1, _) -> sqrtShow (numerator a) b
+      (_, 1) -> sqrtShow a (numerator b)
+      (_, _) -> sqrtShow a b
+      where
+        sqrtShow outer inner = show outer ++ " sqrt(" ++ show inner ++ ")"
+
+    show (Perfect a)
+      | denominator a == 1  = show $ numerator a
+      | otherwise         = show a
+
     show (Sum a b)        = show a ++ " + " ++ show b
 
 data Expr a
@@ -257,11 +268,18 @@ reduceOuterSqrt a = rlToNumSquares $ clean (primeFactorMultiplicity a)
       | even mult = prime ^ div mult 2 * rlToNumSquares rest
       | otherwise = prime ^ div (mult - 1) 2 * rlToNumSquares rest
 
-intToReducedSqrt :: Integer -> ReducedSqrt
-intToReducedSqrt x
-  | reduceInnerSqrt x == 1 = Perfect $ reduceOuterSqrt x
-  | otherwise              = Irrational (reduceOuterSqrt x) (reduceInnerSqrt x)
-
+intToReducedSqrt :: Ratio Integer -> ReducedSqrt
+intToReducedSqrt x =
+  case (reduceInnerSqrt $ numerator x, reduceInnerSqrt $ denominator x) of
+    (1, 1) -> Perfect $ numOuterReduce % denOuterReduce
+    (1, simple) -> Irrational (numOuterReduce % denOuterReduce)
+                              ( 1 % simple)
+    (simple, 1) -> Irrational (numOuterReduce % denOuterReduce)
+                              (simple % 1)
+    (simpleN, simpleD) -> Irrational (numOuterReduce % reduceOuterSqrt (denominator x))
+                                     (simpleN % simpleD)
+    where numOuterReduce = reduceOuterSqrt (numerator x)
+          denOuterReduce = reduceOuterSqrt (denominator x)
 
 rSqrtMult :: ReducedSqrt -> ReducedSqrt -> ReducedSqrt
 rSqrtMult (Perfect a) (Perfect b) = Perfect (a*b)
@@ -283,24 +301,26 @@ rSqrtMult l1@(Sum _ _) l2@(Sum _ _)
   | otherwise = simplifySum $ collectTerms $ distributiveMult [l2] (flattenSum [l1])
 
 eval :: Expr Integer -> ReducedSqrt
-eval (Reduced x) = Perfect x
-eval (Sqrt (Reduced a)) = intToReducedSqrt a
+eval (Reduced x) = Perfect $ x % 1
+eval (Sqrt (Reduced a)) = intToReducedSqrt (a % 1)
 eval (Sqrt e) =
   case eval e of
     Perfect x -> intToReducedSqrt x
-    other     -> Irrational 1 (toInnerSqrt other)
+    other     -> Irrational 1 (toInnerSqrt other % 1)
 eval (Add a b) = addR (eval a) (eval b)
 eval (Sub a b) = subR (eval a) (eval b)
 eval (Mult a b) = rSqrtMult (eval a) (eval b)
 eval (Div a b) =
   case (eval a, eval b) of
+    -- TODO write integeral for ReducedSqrt
     (Perfect m, Perfect n)
-      | n /= 0 -> Perfect (m `div` n)
+      -- | n /= 0 -> Perfect (m `div` n)
+      | n /= 0 -> Perfect (m / n)
       | otherwise -> Sum (Perfect m) (Perfect n)  -- fallback for div-by-zero
     (x, y) -> Sum x y  -- symbolic fallback
 eval (Exp base power) =
   case (eval base, eval power) of
-    (Perfect b, Perfect e) -> Perfect (b ^ e)
+    (Perfect b, Perfect e) -> Perfect (b ^ 2) -- fallback, TODO add rational exponent support
     (b, Perfect e)
       | e == 2 -> rSqrtMult b b
       | otherwise -> Sum b (Perfect e)  -- symbolic fallback
@@ -311,19 +331,20 @@ eval (Negate e) =
     Irrational a b -> Irrational (-a) b
     Sum x y -> Sum (eval (Negate (reducedSqrtToExpr x)))
                    (eval (Negate (reducedSqrtToExpr y)))
+
 fromExpr :: Expr ReducedSqrt -> ReducedSqrt
 fromExpr (Reduced a) = a
 fromExpr _ = error "fromExpr error"
 
 -- Helper to convert ReducedSqrt back to Expr for symbolic use (e.g. in Negate)
 reducedSqrtToExpr :: ReducedSqrt -> Expr Integer
-reducedSqrtToExpr (Perfect x) = Reduced x
-reducedSqrtToExpr (Irrational a b) = Mult (Reduced a) (Sqrt (Reduced b))
+reducedSqrtToExpr (Perfect x) = Reduced $ numerator x
+reducedSqrtToExpr (Irrational a b) = Mult (Reduced $ numerator a) (Sqrt (Reduced $ numerator b))
 reducedSqrtToExpr (Sum x y) = Add (reducedSqrtToExpr x) (reducedSqrtToExpr y)
 
 toInnerSqrt :: ReducedSqrt -> Integer
-toInnerSqrt (Perfect x) = x
-toInnerSqrt (Irrational _ b) = b
+toInnerSqrt (Perfect x) = numerator x
+toInnerSqrt (Irrational _ b) = numerator b
 toInnerSqrt (Sum _ _) = 0  -- fallback for now (cold raise symbolic sqrt expression)
 
 
