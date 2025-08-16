@@ -22,11 +22,11 @@ instance Num ReducedSqrt where
   abs x@(Sum _ _) = case simplifySum $ collectTerms $ flattenSum [x] of
     Perfect a -> abs $ Perfect a
     Irrational a b -> abs $ Irrational a b
-    Sum a b -> error "indeterminate, implement later"
+    Sum a b -> error "indeterminate, implement later" --TODO implement
 
   signum (Perfect a) = Perfect $ signum a
   signum (Irrational a _) = Perfect $ signum a
-  signum (Sum a b) = error "indeterminant, implment later"
+  signum (Sum a b) = error "implement later"
 
   fromInteger x = Perfect (x % 1)
 
@@ -137,9 +137,7 @@ baseP = token intExprP <|> token parenP <|> token sqrtP
 
 factorP :: Parser (Expr Integer)
 factorP =
-  baseP >>= \b -> (token(charP '^') >>= \_ ->
-                    factorP >>= \f ->
-                      return (Exp b f))
+  baseP >>= \b -> token(charP '^') >> (factorP >>= \f ->return (Exp b f))
                   <|> return b
 
 spanP :: (Char -> Bool) -> Parser String
@@ -206,9 +204,9 @@ collectTerms = combinePerfects . combineIrrationals
     combinePerfects xs =
       let (perfects, rest) = partitionPerfect xs
           total = sum [n | Perfect n <- perfects]
-      in (if total /= 0 then [Perfect total] else []) ++ rest
+      in [Perfect total | total /= 0] ++ rest
 
-    combineIrrationals xs = foldr insertIrrational [] xs
+    combineIrrationals = foldr insertIrrational []
 
     insertIrrational (Irrational a r) acc =
       let (same, others) = span (\x -> case x of Irrational _ r' -> r == r'; _ -> False) acc
@@ -316,11 +314,14 @@ eval (Div a b) =
     (Perfect m, Perfect n)
       -- | n /= 0 -> Perfect (m `div` n)
       | n /= 0 -> Perfect (m / n)
-      | otherwise -> Sum (Perfect m) (Perfect n)  -- fallback for div-by-zero
+      | otherwise -> error "Division by zero"  -- fallback for div-by-zero
     (x, y) -> Sum x y  -- symbolic fallback
 eval (Exp base power) =
   case (eval base, eval power) of
-    (Perfect b, Perfect e) -> Perfect (b ^ 2) -- fallback, TODO add rational exponent support
+    (Perfect b, Perfect e) ->
+      case denominator e of
+        1 -> Perfect $ numerator b^numerator e % denominator b^numerator e -- handle integer powers with rational base
+        _ -> error "wut"-- fallback, TODO add rational exponent support
     (b, Perfect e)
       | e == 2 -> rSqrtMult b b
       | otherwise -> Sum b (Perfect e)  -- symbolic fallback
@@ -349,7 +350,7 @@ toInnerSqrt (Sum _ _) = 0  -- fallback for now (cold raise symbolic sqrt express
 
 
 evalPrint :: Maybe ReducedSqrt
-evalPrint = (eval.fst) <$> test
+evalPrint = eval.fst <$> test
 
 test1 = Add (Reduced (Perfect 3)) (Reduced (Perfect 5))
 
