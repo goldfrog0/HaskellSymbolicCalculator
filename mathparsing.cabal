@@ -68,7 +68,7 @@ library
     -- other-extensions:
 
     -- Other library packages from which modules are imported.
-    build-depends:    base ^>=4.18.3.0
+    build-depends:    base >=4.17
 
     -- Directories containing source files.
     hs-source-dirs:   src
@@ -91,7 +91,7 @@ executable mathparsing
 
     -- Other library packages from which modules are imported.
     build-depends:
-        base ^>=4.18.3.0,
+        base >=4.17,
         mathparsing
 
     -- Directories containing source files.
@@ -124,5 +124,5 @@ test-suite mathparsing-test
 
     -- Test dependencies.
     build-depends:
-        base ^>=4.18.3.0,
+        base >=4.17,
         mathparsing

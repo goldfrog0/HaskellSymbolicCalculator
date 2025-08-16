@@ -137,7 +137,9 @@ baseP = token intExprP <|> token parenP <|> token sqrtP
 
 factorP :: Parser (Expr Integer)
 factorP =
-  baseP >>= \b -> token(charP '^') >> (factorP >>= \f ->return (Exp b f))
+   baseP >>= \b -> (token(charP '^') >>= \_ ->
+                    factorP >>= \f ->
+                      return (Exp b f))
                   <|> return b
 
 spanP :: (Char -> Bool) -> Parser String
