@@ -1,5 +1,6 @@
 module Main where
 
+import ParsingLib
 import MyLib
 import Data.Maybe
 
