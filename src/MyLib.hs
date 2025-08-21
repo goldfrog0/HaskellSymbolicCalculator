@@ -32,7 +32,7 @@ instance Num ReducedSqrt where
   fromInteger x = Perfect (x % 1)
 
 addR :: ReducedSqrt -> ReducedSqrt -> ReducedSqrt
-addR a b = simplifySum (collectTerms (flattenSum [a, b]))
+addR a b = simplifySum $ collectTerms $ flattenSum [a, b]
 
 instance Show ReducedSqrt where
 
@@ -43,6 +43,7 @@ instance Show ReducedSqrt where
       (_, 1) -> sqrtShow a (numerator b)
       (_, _) -> sqrtShow a b
       where
+        sqrtShow 1 inner     = "sqrt(" ++ show inner ++ ")"
         sqrtShow outer inner = show outer ++ " sqrt(" ++ show inner ++ ")"
 
     show (Perfect a)
